@@ -51,19 +51,25 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
   const th = Math.max(10, p.tapeHeight)
   const tc = p.tapeColor
 
-  const maxR = th * 1.55
-  const coreR = maxR * 0.28
+  // Roll geometry: cylinder viewed from above-slightly-front.
+  // The roll sits flat on a surface; you see the top circular FACE (oval due to perspective)
+  // with the HOLE at its center. The cylinder SIDES are visible below as a capsule/pill shape.
+  // Tape exits from the right side of the cylinder at mid-height.
+
+  const maxR = th * 1.55       // max outer radius in Figma units
+  const coreR = maxR * 0.28   // fixed cardboard core radius
   const outerR = p.showRoll
     ? Math.max(coreR + 2, maxR * Math.max(0.04, p.rollOuterR))
     : 0
-  const capRy = outerR * 0.40
-  const cylH = th
+  const capRy = outerR * 0.40  // perspective squish on ovals (how flat they appear from above)
+  const cylH = th              // cylinder height = tape width (shown edge-on in perspective)
 
+  // Figma positions
   const margin = 12
-  const rollCx = outerR + margin
+  const rollCx = outerR + margin            // center x of roll
   const totalRollH = cylH + capRy * 2 + margin * 2
   const totalH = Math.max(totalRollH, th + margin * 2)
-  const rollCy = totalH / 2
+  const rollCy = totalH / 2                // center y of roll
 
   const tapeX = p.showRoll ? Math.round(rollCx + outerR - 6) : margin
   const tapeY = Math.round((totalH - th) / 2)
@@ -79,6 +85,9 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
 
   // ── Roll ─────────────────────────────────────────────────────────────
   if (p.showRoll) {
+    // Z-order: bottom oval → body rect → top face → rings → core
+
+    // 1. Bottom oval (lower edge of cylinder — slightly darker, adds depth)
     const botOval = figma.createEllipse()
     botOval.name = 'bottom edge'
     botOval.resize(Math.max(1, outerR * 2), Math.max(1, capRy * 2))
@@ -89,6 +98,7 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
     botOval.strokeWeight = 1.5
     container.appendChild(botOval)
 
+    // 2. Cylinder body rectangle (the straight-sided part of the capsule)
     const body = figma.createFrame()
     body.name = 'cylinder body'
     body.resize(Math.max(1, outerR * 2), Math.max(1, cylH))
@@ -103,6 +113,7 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
       radius: 12, spread: 0, visible: true, blendMode: 'NORMAL'
     }]
 
+    // Pattern on body
     if (p.patternBytes && p.patternBytes.length > 0) {
       const img = figma.createImage(new Uint8Array(p.patternBytes))
       body.fills = [body.fills[0] as SolidPaint, {
@@ -120,6 +131,7 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
     }
     container.appendChild(body)
 
+    // 3. Top face oval (THE circular face seen from above — tape color, shows wound layers + hole)
     const topFace = figma.createEllipse()
     topFace.name = 'top face'
     topFace.resize(Math.max(1, outerR * 2), Math.max(1, capRy * 2))
@@ -130,6 +142,7 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
     topFace.strokeWeight = 2
     container.appendChild(topFace)
 
+    // 4. Wound tape rings (concentric ovals between core and outer edge, on the top face)
     for (let i = 1; i <= 3; i++) {
       const r = coreR + (outerR - coreR) * (i / 4)
       const rRy = r / outerR * capRy
@@ -144,6 +157,7 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
       container.appendChild(ring)
     }
 
+    // 5. Core / hole (cardboard tube — fixed size, never shrinks)
     const coreRy = coreR / outerR * capRy
     const core = figma.createEllipse()
     core.name = 'core hole'
@@ -189,7 +203,7 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
   }
   container.appendChild(tape)
 
-  // ── Zigzag mask — clips tape to serrated edge shape ─────────
+  // ── Zigzag mask — clips tape to serrated edge shape ─────────────
   {
     const toothH = 8
     const toothD = 5
@@ -232,6 +246,8 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
       color: { r: 0, g: 0, b: 0, a: 0.13 },
       offset: { x: 0, y: 3 }, radius: 8, spread: 0, visible: true, blendMode: 'NORMAL'
     }]
+    // Move tape behind roll so spool renders on top (matches preview)
+    container.insertChild(0, tapeGroup)
   }
 
   figma.currentPage.appendChild(container)
