@@ -158,18 +158,12 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
 
   // ── Tape strip ──────────────────────────────────────────────────────────
   const tape = figma.createFrame()
-  tape.name = 'tape strip'
+  tape.name = 'tape fill'
   tape.resize(Math.max(1, tw), Math.max(1, th))
   tape.x = tapeX
   tape.y = tapeY
   tape.clipsContent = true
-  tape.opacity = Math.max(0.05, Math.min(1, p.opacity))
   tape.fills = [{ type: 'SOLID', color: tc }]
-  tape.effects = [{
-    type: 'DROP_SHADOW',
-    color: { r: 0, g: 0, b: 0, a: 0.13 },
-    offset: { x: 0, y: 3 }, radius: 8, spread: 0, visible: true, blendMode: 'NORMAL'
-  }]
 
   if (p.patternBytes && p.patternBytes.length > 0) {
     const bytes = new Uint8Array(p.patternBytes)
@@ -195,48 +189,49 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
   }
   container.appendChild(tape)
 
-  // ── Serrated edges — uniform zigzag on BOTH left and right ends ─────────
+  // ── Zigzag mask — clips tape to serrated edge shape ─────────
   {
     const toothH = 8
     const toothD = 5
     const teeth = Math.max(3, Math.round(th / toothH))
     const step = th / teeth
 
-    // Right edge zigzag
-    const rx = tapeX + tw, ry = tapeY
-    let rd = `M ${rx} ${ry}`
+    let md = `M ${tapeX} ${tapeY}`
+    md += ` L ${tapeX + tw} ${tapeY}`
     for (let i = 0; i < teeth; i++) {
-      const midY = ry + step * i + step / 2
-      const botY = ry + step * (i + 1)
-      rd += ` L ${rx + toothD} ${midY} L ${rx} ${botY}`
+      const midY = tapeY + step * i + step / 2
+      const botY = tapeY + step * (i + 1)
+      md += ` L ${tapeX + tw + toothD} ${midY} L ${tapeX + tw} ${botY}`
     }
-    rd += ` L ${rx + toothD + 2} ${ry + th} L ${rx + toothD + 2} ${ry} Z`
-    const rEdge = figma.createVector()
-    rEdge.name = 'right serration'
-    rEdge.vectorPaths = [{ windingRule: 'NONZERO' as WindingRule, data: rd }]
-    rEdge.fills = [{ type: 'SOLID', color: tc }]
-    rEdge.strokes = [{ type: 'SOLID', color: dk(tc, 0.12) }]
-    rEdge.strokeWeight = 1.2
-    rEdge.opacity = Math.max(0.05, Math.min(1, p.opacity))
-    container.appendChild(rEdge)
+    md += ` L ${tapeX} ${tapeY + th}`
+    if (!p.showRoll) {
+      for (let i = teeth - 1; i >= 0; i--) {
+        const midY = tapeY + step * i + step / 2
+        const topY = tapeY + step * i
+        md += ` L ${tapeX - toothD} ${midY} L ${tapeX} ${topY}`
+      }
+    }
+    md += ` Z`
 
-    // Left edge zigzag
-    const lx = tapeX, ly = tapeY
-    let ld = `M ${lx} ${ly}`
-    for (let i = 0; i < teeth; i++) {
-      const midY = ly + step * i + step / 2
-      const botY = ly + step * (i + 1)
-      ld += ` L ${lx - toothD} ${midY} L ${lx} ${botY}`
-    }
-    ld += ` L ${lx - toothD - 2} ${ly + th} L ${lx - toothD - 2} ${ly} Z`
-    const lEdge = figma.createVector()
-    lEdge.name = 'left serration'
-    lEdge.vectorPaths = [{ windingRule: 'NONZERO' as WindingRule, data: ld }]
-    lEdge.fills = [{ type: 'SOLID', color: tc }]
-    lEdge.strokes = [{ type: 'SOLID', color: dk(tc, 0.12) }]
-    lEdge.strokeWeight = 1.2
-    lEdge.opacity = Math.max(0.05, Math.min(1, p.opacity))
-    container.appendChild(lEdge)
+    const mask = figma.createVector()
+    mask.name = 'tape shape'
+    mask.vectorPaths = [{ windingRule: 'NONZERO' as WindingRule, data: md }]
+    mask.fills = [{ type: 'SOLID', color: tc }]
+    mask.strokes = [{ type: 'SOLID', color: dk(tc, 0.12) }]
+    mask.strokeWeight = 1.2
+
+    const tapeIdx = container.children.length - 1
+    container.insertChild(tapeIdx, mask)
+
+    const tapeGroup = figma.group([mask, tape], container)
+    tapeGroup.name = 'tape strip'
+    mask.isMask = true
+    tapeGroup.opacity = Math.max(0.05, Math.min(1, p.opacity))
+    tapeGroup.effects = [{
+      type: 'DROP_SHADOW',
+      color: { r: 0, g: 0, b: 0, a: 0.13 },
+      offset: { x: 0, y: 3 }, radius: 8, spread: 0, visible: true, blendMode: 'NORMAL'
+    }]
   }
 
   figma.currentPage.appendChild(container)
