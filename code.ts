@@ -26,7 +26,7 @@ figma.ui.onmessage = async (msg: { type: string; [key: string]: unknown }) => {
   }
   if (msg.type === 'add-to-canvas') {
     await buildWashiTape(msg as unknown as TapeMsg)
-    figma.notify('taperd: tape added')
+    figma.notify('washi tape added')
   }
 }
 
@@ -50,28 +50,34 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
   const tw = Math.max(40, p.tapeWidth)
   const th = Math.max(10, p.tapeHeight)
   const tc = p.tapeColor
+
   const maxR = th * 1.55
   const coreR = maxR * 0.28
-  const outerR = p.showRoll ? Math.max(coreR + 2, maxR * Math.max(0.04, p.rollOuterR)) : 0
+  const outerR = p.showRoll
+    ? Math.max(coreR + 2, maxR * Math.max(0.04, p.rollOuterR))
+    : 0
   const capRy = outerR * 0.40
   const cylH = th
+
   const margin = 12
   const rollCx = outerR + margin
   const totalRollH = cylH + capRy * 2 + margin * 2
   const totalH = Math.max(totalRollH, th + margin * 2)
   const rollCy = totalH / 2
+
   const tapeX = p.showRoll ? Math.round(rollCx + outerR - 6) : margin
   const tapeY = Math.round((totalH - th) / 2)
   const totalW = Math.max(1, tapeX + tw + margin)
 
   const container = figma.createFrame()
-  container.name = 'taperd'
+  container.name = 'washi tape'
   container.fills = []
   container.clipsContent = false
   container.resize(Math.max(1, totalW), Math.max(1, totalH))
   container.x = Math.round(figma.viewport.center.x - totalW / 2)
   container.y = Math.round(figma.viewport.center.y - totalH / 2)
 
+  // ── Roll ─────────────────────────────────────────────────────────────
   if (p.showRoll) {
     const botOval = figma.createEllipse()
     botOval.name = 'bottom edge'
@@ -90,14 +96,27 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
     body.y = Math.round(rollCy - cylH / 2)
     body.fills = [{ type: 'SOLID', color: dk(tc, 0.06) }]
     body.clipsContent = true
-    body.effects = [{ type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 0.18 }, offset: { x: 2, y: Math.round(cylH * 0.4 + capRy) }, radius: 12, spread: 0, visible: true, blendMode: 'NORMAL' }]
+    body.effects = [{
+      type: 'DROP_SHADOW',
+      color: { r: 0, g: 0, b: 0, a: 0.18 },
+      offset: { x: 2, y: Math.round(cylH * 0.4 + capRy) },
+      radius: 12, spread: 0, visible: true, blendMode: 'NORMAL'
+    }]
 
     if (p.patternBytes && p.patternBytes.length > 0) {
       const img = figma.createImage(new Uint8Array(p.patternBytes))
-      body.fills = [body.fills[0] as SolidPaint, { type: 'IMAGE', scaleMode: 'TILE', imageHash: img.hash, opacity: 0.75 } as ImagePaint]
+      body.fills = [body.fills[0] as SolidPaint, {
+        type: 'IMAGE', scaleMode: 'TILE', imageHash: img.hash, opacity: 0.75
+      } as ImagePaint]
     } else if (p.patternSource === 'builtin') {
       const svg = buildPatternSvg(p.patternType, p.patternColor, outerR * 2, cylH)
-      try { const svgN = figma.createNodeFromSvg(svg); svgN.name = 'body pattern'; svgN.resize(Math.max(1, outerR * 2), Math.max(1, cylH)); svgN.x = 0; svgN.y = 0; body.appendChild(svgN) } catch (_e) {}
+      try {
+        const svgN = figma.createNodeFromSvg(svg)
+        svgN.name = 'body pattern'
+        svgN.resize(Math.max(1, outerR * 2), Math.max(1, cylH))
+        svgN.x = 0; svgN.y = 0
+        body.appendChild(svgN)
+      } catch (_e) { /* skip */ }
     }
     container.appendChild(body)
 
@@ -117,29 +136,40 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
       const ring = figma.createEllipse()
       ring.name = 'ring'
       ring.resize(Math.max(1, r * 2), Math.max(1, rRy * 2))
-      ring.x = Math.round(rollCx - r); ring.y = Math.round(rollCy - cylH / 2 - rRy)
-      ring.fills = []; ring.strokes = [{ type: 'SOLID', color: dk(tc, 0.14), opacity: 0.38 }]; ring.strokeWeight = 1.2
+      ring.x = Math.round(rollCx - r)
+      ring.y = Math.round(rollCy - cylH / 2 - rRy)
+      ring.fills = []
+      ring.strokes = [{ type: 'SOLID', color: dk(tc, 0.14), opacity: 0.38 }]
+      ring.strokeWeight = 1.2
       container.appendChild(ring)
     }
 
     const coreRy = coreR / outerR * capRy
     const core = figma.createEllipse()
-    core.name = 'core'
+    core.name = 'core hole'
     core.resize(Math.max(1, coreR * 2), Math.max(1, coreRy * 2))
-    core.x = Math.round(rollCx - coreR); core.y = Math.round(rollCy - cylH / 2 - coreRy)
+    core.x = Math.round(rollCx - coreR)
+    core.y = Math.round(rollCy - cylH / 2 - coreRy)
     core.fills = [{ type: 'SOLID', color: { r: 0.70, g: 0.55, b: 0.35 } }]
-    core.strokes = [{ type: 'SOLID', color: { r: 0.56, g: 0.43, b: 0.26 } }]; core.strokeWeight = 1.5
+    core.strokes = [{ type: 'SOLID', color: { r: 0.56, g: 0.43, b: 0.26 } }]
+    core.strokeWeight = 1.5
     container.appendChild(core)
   }
 
+  // ── Tape strip ──────────────────────────────────────────────────────────
   const tape = figma.createFrame()
   tape.name = 'tape strip'
   tape.resize(Math.max(1, tw), Math.max(1, th))
-  tape.x = tapeX; tape.y = tapeY
+  tape.x = tapeX
+  tape.y = tapeY
   tape.clipsContent = true
   tape.opacity = Math.max(0.05, Math.min(1, p.opacity))
   tape.fills = [{ type: 'SOLID', color: tc }]
-  tape.effects = [{ type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 0.13 }, offset: { x: 0, y: 3 }, radius: 8, spread: 0, visible: true, blendMode: 'NORMAL' }]
+  tape.effects = [{
+    type: 'DROP_SHADOW',
+    color: { r: 0, g: 0, b: 0, a: 0.13 },
+    offset: { x: 0, y: 3 }, radius: 8, spread: 0, visible: true, blendMode: 'NORMAL'
+  }]
 
   if (p.patternBytes && p.patternBytes.length > 0) {
     const bytes = new Uint8Array(p.patternBytes)
@@ -147,24 +177,66 @@ async function buildWashiTape(p: TapeMsg): Promise<void> {
     const sc = Math.max(0.1, p.patternScale)
     const rot = (p.patternRotation * Math.PI) / 180
     const cosA = Math.cos(rot) / sc, sinA = Math.sin(rot) / sc
-    const tx2 = (p.patternOffsetX / 100) + (1 - cosA) / 2 - (-sinA) / 2
-    const ty2 = (p.patternOffsetY / 100) + sinA / 2 + (1 - cosA) / 2
-    tape.fills = [tape.fills[0] as SolidPaint, { type: 'IMAGE', scaleMode: p.patternRepeat ? 'TILE' : 'FIT', imageHash: img.hash, opacity: 0.9, imageTransform: [[cosA, -sinA, tx2], [sinA, cosA, ty2]] } as ImagePaint]
+    const tx = (p.patternOffsetX / 100) + (1 - cosA) / 2 - (-sinA) / 2
+    const ty = (p.patternOffsetY / 100) + sinA / 2 + (1 - cosA) / 2
+    tape.fills = [tape.fills[0] as SolidPaint, {
+      type: 'IMAGE', scaleMode: p.patternRepeat ? 'TILE' : 'FIT',
+      imageHash: img.hash, opacity: 0.9,
+      imageTransform: [[cosA, -sinA, tx], [sinA, cosA, ty]]
+    } as ImagePaint]
   } else if (p.patternSource === 'builtin') {
     const svg = buildPatternSvg(p.patternType, p.patternColor, tw, th)
-    try { const svgN = figma.createNodeFromSvg(svg); svgN.name = 'pattern'; svgN.resize(Math.max(1, tw), Math.max(1, th)); svgN.x = 0; svgN.y = 0; tape.appendChild(svgN) } catch (_e) {}
+    try {
+      const svgN = figma.createNodeFromSvg(svg)
+      svgN.name = 'pattern'; svgN.resize(Math.max(1, tw), Math.max(1, th))
+      svgN.x = 0; svgN.y = 0
+      tape.appendChild(svgN)
+    } catch (_e) { /* skip */ }
   }
   container.appendChild(tape)
 
-  if (p.tornEdge) {
-    const ex = tapeX + tw, ey = tapeY
-    let d = `M ${ex} ${ey}`
-    for (let i = 0; i <= 10; i++) { const py = ey + (i / 10) * th; const px = ex + Math.sin(i * 2.1) * 6 + Math.cos(i * 3.7) * 2; d += ` L ${px} ${py}` }
-    d += ` L ${ex + 22} ${ey + th} L ${ex + 22} ${ey} Z`
-    const torn = figma.createVector()
-    torn.name = 'torn edge'; torn.vectorPaths = [{ windingRule: 'NONZERO' as WindingRule, data: d }]
-    torn.fills = [{ type: 'SOLID', color: { r: 0.97, g: 0.95, b: 0.90 } }]; torn.strokes = []
-    container.appendChild(torn)
+  // ── Serrated edges — uniform zigzag on BOTH left and right ends ─────────
+  {
+    const toothH = 8
+    const toothD = 5
+    const teeth = Math.max(3, Math.round(th / toothH))
+    const step = th / teeth
+
+    // Right edge zigzag
+    const rx = tapeX + tw, ry = tapeY
+    let rd = `M ${rx} ${ry}`
+    for (let i = 0; i < teeth; i++) {
+      const midY = ry + step * i + step / 2
+      const botY = ry + step * (i + 1)
+      rd += ` L ${rx + toothD} ${midY} L ${rx} ${botY}`
+    }
+    rd += ` L ${rx + toothD + 2} ${ry + th} L ${rx + toothD + 2} ${ry} Z`
+    const rEdge = figma.createVector()
+    rEdge.name = 'right serration'
+    rEdge.vectorPaths = [{ windingRule: 'NONZERO' as WindingRule, data: rd }]
+    rEdge.fills = [{ type: 'SOLID', color: tc }]
+    rEdge.strokes = [{ type: 'SOLID', color: dk(tc, 0.12) }]
+    rEdge.strokeWeight = 1.2
+    rEdge.opacity = Math.max(0.05, Math.min(1, p.opacity))
+    container.appendChild(rEdge)
+
+    // Left edge zigzag
+    const lx = tapeX, ly = tapeY
+    let ld = `M ${lx} ${ly}`
+    for (let i = 0; i < teeth; i++) {
+      const midY = ly + step * i + step / 2
+      const botY = ly + step * (i + 1)
+      ld += ` L ${lx - toothD} ${midY} L ${lx} ${botY}`
+    }
+    ld += ` L ${lx - toothD - 2} ${ly + th} L ${lx - toothD - 2} ${ly} Z`
+    const lEdge = figma.createVector()
+    lEdge.name = 'left serration'
+    lEdge.vectorPaths = [{ windingRule: 'NONZERO' as WindingRule, data: ld }]
+    lEdge.fills = [{ type: 'SOLID', color: tc }]
+    lEdge.strokes = [{ type: 'SOLID', color: dk(tc, 0.12) }]
+    lEdge.strokeWeight = 1.2
+    lEdge.opacity = Math.max(0.05, Math.min(1, p.opacity))
+    container.appendChild(lEdge)
   }
 
   figma.currentPage.appendChild(container)
@@ -179,7 +251,13 @@ function buildPatternSvg(type: string, color: { r: number; g: number; b: number;
   let body = ''
   if (type === 'botanicals') {
     body = `<g fill="${c}" stroke="${c}" stroke-linecap="round" stroke-linejoin="round">`
-    const items = [`<line x1="0" y1="6" x2="0" y2="-6" stroke-width="1.5" fill="none"/><path d="M-5,-8 C-5,-14 5,-14 5,-8 C5,-4 0,-2 0,-2 C0,-2 -5,-4 -5,-8Z" stroke="none"/>`,`<rect x="-2" y="2" width="4" height="6" stroke="none"/><polygon points="0,-12 -8,2 8,2" stroke="none"/>`,`<line x1="0" y1="7" x2="0" y2="-7" stroke-width="1.5" fill="none"/><path d="M0,-7 C7,-2 7,5 0,7 C-7,5 -7,-2 0,-7Z" stroke="none" opacity="0.85"/>`,`<ellipse cx="-4" cy="3" rx="8" ry="5" stroke="none"/><circle cx="5" cy="-2" r="4.5" stroke="none"/><path d="M8,-2 L14,-1 L8,-0.5Z" stroke="none"/>`,`<line x1="0" y1="-12" x2="0" y2="0" stroke-width="1.5" fill="none"/><circle cx="0" cy="0" r="4.5" stroke="none"/><circle cx="-6" cy="-2" r="3.5" stroke="none"/><circle cx="5" cy="-3" r="3" stroke="none"/>`]
+    const items = [
+      `<line x1="0" y1="6" x2="0" y2="-6" stroke-width="1.5" fill="none"/><path d="M-5,-8 C-5,-14 5,-14 5,-8 C5,-4 0,-2 0,-2 C0,-2 -5,-4 -5,-8Z" stroke="none"/>`,
+      `<rect x="-2" y="2" width="4" height="6" stroke="none"/><polygon points="0,-12 -8,2 8,2" stroke="none"/>`,
+      `<line x1="0" y1="7" x2="0" y2="-7" stroke-width="1.5" fill="none"/><path d="M0,-7 C7,-2 7,5 0,7 C-7,5 -7,-2 0,-7Z" stroke="none" opacity="0.85"/>`,
+      `<ellipse cx="-4" cy="3" rx="8" ry="5" stroke="none"/><circle cx="5" cy="-2" r="4.5" stroke="none"/><path d="M8,-2 L14,-1 L8,-0.5Z" stroke="none"/>`,
+      `<line x1="0" y1="-12" x2="0" y2="0" stroke-width="1.5" fill="none"/><circle cx="0" cy="0" r="4.5" stroke="none"/><circle cx="-6" cy="-2" r="3.5" stroke="none"/><circle cx="5" cy="-3" r="3" stroke="none"/>`,
+    ]
     for (let i = 0; i * 40 < w + 40; i++) body += `<g transform="translate(${20+i*40},${mid})">${items[i%items.length]}</g>`
     body += '</g>'
   } else if (type === 'animals') {
@@ -192,7 +270,11 @@ function buildPatternSvg(type: string, color: { r: number; g: number; b: number;
     body += '</g>'
   } else if (type === 'stars') {
     body = `<g fill="${c}">`
-    for (let i = 0; i * 40 < w + 40; i++) { const cx2 = 20+i*40; let pts = ''; for (let k = 0; k < 5; k++) { const a=(k*72-90)*Math.PI/180,a2=(k*72+36-90)*Math.PI/180; pts+=`${cx2+7*Math.cos(a)},${mid+7*Math.sin(a)} ${cx2+3*Math.cos(a2)},${mid+3*Math.sin(a2)} ` }; body += `<polygon points="${pts.trim()}"/>` }
+    for (let i = 0; i * 40 < w + 40; i++) {
+      const cx2 = 20+i*40; let pts = ''
+      for (let k = 0; k < 5; k++) { const a=(k*72-90)*Math.PI/180,a2=(k*72+36-90)*Math.PI/180; pts+=`${cx2+7*Math.cos(a)},${mid+7*Math.sin(a)} ${cx2+3*Math.cos(a2)},${mid+3*Math.sin(a2)} ` }
+      body += `<polygon points="${pts.trim()}"/>`
+    }
     body += '</g>'
   } else if (type === 'stripes') {
     body = `<g stroke="${c}" stroke-width="2.5" opacity="0.45">`
